@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>JEE.DSGNS</title>
+<meta name="description" content="JEE.DSGNS — graphic design portfolio of Jerro Magano. Double-click the logo to enter.">
+<link rel="icon" href="images/logo.png">
+<link rel="prefetch" href="portfolio.html">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@500&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%;overflow:hidden;background:#000;color:#F2F2F0;font-family:'Inter',system-ui,sans-serif;-webkit-tap-highlight-color:transparent}
+body{background-size:cover;background-position:center}
+canvas{position:fixed;inset:0;width:100%;height:100%;display:block;opacity:0;touch-action:none}
+#grain{position:fixed;inset:0;pointer-events:none;opacity:.05;mix-blend-mode:overlay;background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence baseFrequency='.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)'/%3E%3C/svg%3E")}
+#vig{position:fixed;inset:0;pointer-events:none;background:radial-gradient(ellipse at center,transparent 50%,rgba(0,0,0,.65))}
+#hint{position:fixed;left:0;right:0;bottom:clamp(2rem,9vh,5rem);text-align:center;font-size:.72rem;letter-spacing:.42em;text-transform:uppercase;color:#E5E7E9;opacity:0;pointer-events:none;padding-left:.42em;text-shadow:0 0 12px #000}
+#hint.on{animation:blink 2.6s ease-in-out infinite}
+@keyframes blink{0%,100%{opacity:.25}50%{opacity:.95}}
+#veil{position:fixed;inset:0;background:#080808;opacity:0;pointer-events:none}
+#fallback{position:fixed;top:50%;left:50%;width:min(88vw,1100px);transform:translate(-50%,-50%);display:none;cursor:pointer;filter:drop-shadow(0 0 20px rgba(190,205,225,.3))}
+body.nogl #fallback{display:block}
+#enter{position:fixed;left:50%;top:50%;width:1px;height:1px;opacity:0}
+#enter:focus-visible{opacity:1;width:auto;height:auto;transform:translate(-50%,-50%);padding:1rem 2rem;background:#E5E7E9;color:#080808;border:0;border-radius:99px;font:inherit;letter-spacing:.2em;z-index:5}
+body.hover canvas{cursor:pointer}
+@media(prefers-reduced-motion:reduce){#hint.on{animation:none;opacity:.8}}
+</style>
+</head>
+<body>
+<canvas id="gl" aria-hidden="true"></canvas>
+<img id="fallback" src="images/logo.png" alt="JEE.DSGNS" draggable="false">
+<div id="grain"></div><div id="vig"></div>
+<button id="enter">Enter JEE.DSGNS</button>
+<p id="hint" aria-hidden="true">Double click to enter</p>
+<div id="veil"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script>
+/* ============ SETTINGS ============ */
+const ENTER_URL = "portfolio.html";            // your main portfolio page
+/* 360° SKY: the ONE place to point at your panorama. Equirectangular, 2:1 (e.g. 4096x2048 JPG).
+   Drop your file at this path and it is used automatically (when the site is served over http/https, e.g. GitHub Pages).
+   If the file is missing or cannot load, a procedurally generated 360° sky in the same palette is used instead
+   (so the scene is never flat black) — see makeSkyCanvas() below. */
+const SKY_URL = "images/sky/space-360.jpg";
+const REDUCED = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const TOUCH = matchMedia("(pointer:coarse)").matches;
+/* Logo outline traced from JEE_DSGNS_LOGO.png (x,y pixel pairs; first ring = outline, rest = holes) */
+const SHAPES = [[[2419,107,2381,194,2379,202,2381,209,2422,111]],[[2460,17,2465,30,2543,117,2553,125,2555,122]],[[2648,211,2649,213,2986,212,2988,220,2992,219,2990,212,3016,152,3018,152,3018,155,3000,196,3001,210,3028,145,3028,129,3021,118,3017,125,3005,119,3004,116,3009,115,2820,71,2843,70,2818,69,2818,67,2821,67,2812,68,2800,64,2804,61,2815,66,2810,64,2808,60,2971,60,2985,64,3000,79,3006,75,3006,84,3010,82,3010,71,3063,27,3067,26,3073,29,3075,19,3071,13,3066,19,3059,19,3058,17,3064,14,3062,13,3064,9,2721,9,2729,11,2717,14,2711,19,2713,18,2716,24,2711,28,2712,34,2719,40,2702,82,2696,90,2696,93,2700,92,2705,102,2913,156,2921,160,2916,162,2919,162,2920,165,2914,169,2904,164,2886,164,2871,160,2728,160,2722,163,2724,165,2720,169,2709,163,2703,157,2704,152,2701,147,2698,147,2700,150,2690,155,2694,159],[2804,72,2811,69,2821,70,2812,75]],[[2268,208,2271,209,2273,206,2281,212,2366,212,2369,220,2371,220,2371,210,2420,95,2425,106,2421,91,2423,89,2534,212,2619,212,2623,220,2625,219,2623,212,2645,163,2646,166,2632,199,2634,210,2684,89,2694,70,2705,43,2703,35,2707,29,2708,32,2707,26,2710,14,2708,22,2705,19,2694,18,2698,14,2697,9,2620,9,2627,11,2611,17,2613,19,2611,28,2567,133,2564,137,2559,127,2558,139,2451,19,2447,18,2449,14,2446,9,2355,9,2362,11,2348,17,2352,18,2348,19,2350,25,2346,28,2347,36,2353,40,2291,189,2278,201,2269,204],[2699,33,2700,37,2646,164,2645,161]],[[1173,213,1174,207,1178,208,1180,206,1188,212,1481,212,1498,207,1499,210,1493,218,1505,214,1515,208,1519,201,1518,197,1541,175,1550,163,1563,140,1580,100,1579,108,1564,146,1566,143,1568,144,1566,153,1591,96,1591,85,1597,79,1610,47,1611,35,1614,34,1621,42,1606,79,1599,89,1599,93,1602,91,1608,102,1644,113,1816,156,1824,160,1819,162,1822,162,1823,165,1817,169,1807,164,1788,164,1774,160,1631,160,1625,163,1627,165,1623,169,1612,163,1605,156,1607,152,1604,147,1601,147,1602,150,1593,155,1597,158,1551,211,1552,213,1889,212,1891,220,1895,219,1893,211,1919,152,1921,152,1902,199,1904,210,1934,137,1930,126,1924,118,1920,125,1908,119,1907,116,1912,115,1723,71,1746,70,1721,69,1721,67,1724,67,1715,68,1703,64,1707,61,1718,66,1713,64,1711,60,1874,60,1888,64,1903,79,1908,75,1910,77,1909,84,1913,82,1914,70,1963,29,1975,24,1975,19,1979,19,1982,25,1977,25,1975,30,1985,40,1932,166,1930,177,1925,182,1925,191,1930,189,1931,197,1939,208,1947,212,2163,212,2166,214,2164,218,2157,222,2162,224,2157,236,2151,242,2152,248,2243,229,2245,232,2244,237,2251,235,2249,227,2262,198,2265,197,2264,204,2267,201,2270,202,2272,196,2274,197,2279,192,2276,192,2279,181,2310,108,2311,98,2307,90,2301,95,2295,93,2299,91,2297,89,2298,85,2267,87,2265,85,2262,88,2252,88,2251,85,2127,85,2133,88,2122,90,2115,95,2121,96,2090,133,2089,137,2197,137,2197,140,2189,146,2194,147,2183,172,2178,168,2178,165,2171,167,2171,164,2040,163,2034,167,2031,173,2024,173,2036,163,2036,156,2070,76,2063,76,2035,142,2035,136,2064,65,2067,62,2074,71,2072,61,2242,61,2252,65,2265,79,2271,75,2272,80,2269,83,2272,85,2277,84,2270,83,2276,79,2275,72,2328,27,2337,27,2339,24,2340,26,2341,19,2337,14,2332,19,2324,19,2329,14,2327,12,2329,9,1984,9,1995,11,1978,17,1976,16,1978,12,1976,12,1976,17,1973,19,1961,18,1963,15,1968,15,1965,13,1967,9,1624,9,1631,11,1617,17,1621,18,1617,19,1619,26,1613,33,1611,31,1612,26,1607,21,1602,22,1595,18,1598,14,1595,9,1262,9,1270,11,1256,16,1260,18,1255,19,1257,25,1254,27,1254,35,1260,40,1200,185,1193,195,1175,205],[2278,163,2279,166,2270,185,2269,182],[2034,141,2035,144,2027,159],[2300,110,2301,113,2279,164,2280,155],[1707,72,1714,69,1724,70,1720,71,1720,74,1714,75],[1299,169,1312,160,1311,155,1345,75,1340,74,1337,77,1304,156,1302,154,1341,61,1349,71,1346,61,1504,62,1500,68,1495,70,1501,71,1469,145,1452,163,1448,162,1452,155,1433,164,1424,163,1430,160,1315,161,1310,164,1308,169]],[[380,208,383,207,389,212,717,212,719,220,723,219,721,210,745,181,750,183,751,186,745,191,736,208,739,201,752,190,750,192,748,190,752,187,757,176,756,169,752,165,748,171,742,170,745,161,517,161,508,170,502,170,513,160,512,156,515,151,510,150,504,155,511,137,518,147,516,137,645,137,647,144,651,143,649,134,673,105,682,108,684,103,684,94,681,90,676,95,669,93,673,91,671,89,673,85,548,85,540,94,534,94,545,84,546,75,540,75,537,80,535,79,543,61,550,71,548,61,719,61,728,65,741,79,747,75,748,84,752,79,751,72,800,30,812,24,814,27,810,34,813,28,818,36,824,40,764,185,755,197,743,203,743,208,746,207,752,212,1080,213,1083,220,1086,219,1084,210,1108,181,1113,185,1109,189,1114,182,1121,183,1113,199,1106,206,1106,209,1108,207,1110,212,1158,212,1161,220,1165,218,1163,210,1171,196,1174,197,1174,200,1177,200,1187,191,1183,190,1185,189,1179,176,1174,181,1167,179,1171,176,1170,171,1125,171,1118,178,1120,171,1115,165,1111,171,1104,169,1108,166,1106,164,1108,161,879,161,871,170,864,169,876,160,877,151,872,151,867,155,874,137,881,147,879,137,1008,137,1010,144,1014,143,1012,134,1036,105,1045,107,1047,103,1047,95,1043,89,1039,95,1032,93,1036,91,1034,89,1036,85,911,85,903,94,897,94,907,85,909,75,903,75,900,80,898,79,905,62,913,71,911,61,1082,61,1091,65,1104,79,1110,75,1110,84,1114,82,1114,71,1167,27,1171,26,1177,29,1179,18,1175,13,1170,19,1163,19,1163,16,1168,14,1166,12,1168,9,823,9,834,11,817,17,815,16,817,12,815,12,813,19,799,18,806,14,803,12,806,9,463,9,471,11,457,16,461,18,456,19,458,25,455,27,455,35,461,40,404,179,398,191,382,202],[1122,175,1127,171,1136,173],[813,20,818,19,820,25,814,26,812,24,814,23]],[[442,23,437,16,433,22,426,19,425,16,428,14,425,13,425,9,344,9,351,11,340,14,337,17,341,18,337,19,338,25,335,27,336,37,342,42,289,170,284,162,277,164,277,161,144,160,137,164,133,170,127,170,138,160,137,157,143,144,144,132,140,126,136,131,131,131,134,122,126,122,127,125,123,127,62,137,41,143,39,145,43,146,20,201,14,206,15,213,357,212,361,220,363,219,361,212,369,194,372,193,370,203,377,201,378,196,383,191,384,180,443,38],[431,47,432,50,372,191,373,184]]];
+const W = 3088, H = 266, S = 6 / W;
+
+const $ = s => document.querySelector(s), hint = $("#hint"), veil = $("#veil"), canvas = $("#gl");
+hint.textContent = TOUCH ? "Tap to enter" : "Double click to enter";
+let entering = false, state = null, renderer, camera, group;
+function enter() {
+  if (entering) return; entering = true;
+  gsap.to(hint, { opacity: 0, duration: .3, overwrite: true }); hint.classList.remove("on");
+  if (!state) { gsap.to(veil, { opacity: 1, duration: .6, onComplete: go }); return; }
+  const tl = gsap.timeline({ onComplete: go });
+  tl.to(state, { blend: 1, duration: .9, ease: "power2.inOut" }, 0)
+    .to(group.position, { z: -1.7, y: 0, duration: 2.1, ease: "power3.in" }, .15)
+    .to(renderer, { toneMappingExposure: 2.2, duration: 1.8, ease: "power2.in" }, .3)
+    .to(veil, { opacity: 1, duration: .7, ease: "power1.in" }, 1.6);
+  if (REDUCED) tl.timeScale(2.5);
+}
+function go() { location.href = ENTER_URL; }
+addEventListener("pageshow", e => { if (e.persisted) location.reload(); });
+$("#enter").addEventListener("click", enter);          /* keyboard: Tab, then Enter */
+$("#fallback").addEventListener("dblclick", enter);
+if (TOUCH) $("#fallback").addEventListener("click", enter);
+
+/*SKYGEN_START*/
+/* Procedural equirectangular (2:1) space sky. Nebula noise is sampled on the SPHERE, so the left/right edges
+   wrap seamlessly and there is no pinching at the poles. Palette: black, charcoal, dusty rose, muted purple,
+   copper, amber, white stars and the odd cool-blue star. Used only when SKY_URL cannot be loaded. */
+function makeSkyCanvas(W, H) {
+  let seed = 7319; const rnd = () => (seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296;
+  const perm = new Uint8Array(512), p = [...Array(256).keys()];
+  for (let i = 255; i > 0; i--) { const j = (rnd() * (i + 1)) | 0, t = p[i]; p[i] = p[j]; p[j] = t; }
+  for (let i = 0; i < 512; i++) perm[i] = p[i & 255];
+  const hh = (x, y, z) => perm[perm[perm[x & 255] + (y & 255)] + (z & 255)] / 255, fade = t => t * t * (3 - 2 * t), mix = (a, b, t) => a + (b - a) * t;
+  function vn(x, y, z) {
+    const xi = Math.floor(x), yi = Math.floor(y), zi = Math.floor(z), xf = fade(x - xi), yf = fade(y - yi), zf = fade(z - zi);
+    return mix(
+      mix(mix(hh(xi, yi, zi), hh(xi + 1, yi, zi), xf), mix(hh(xi, yi + 1, zi), hh(xi + 1, yi + 1, zi), xf), yf),
+      mix(mix(hh(xi, yi, zi + 1), hh(xi + 1, yi, zi + 1), xf), mix(hh(xi, yi + 1, zi + 1), hh(xi + 1, yi + 1, zi + 1), xf), yf), zf);
+  }
+  const fbm = (x, y, z, o) => { let s = 0, a = .5, f = 1; for (let i = 0; i < o; i++) { s += a * vn(x * f, y * f, z * f); f *= 2.03; a *= .5; } return s; };
+  const PAL = [[84, 64, 118], [190, 128, 140], [196, 108, 58], [232, 168, 84]];   /* muted purple, dusty rose, copper, amber */
+
+  /* nebula at half resolution (it is soft), then scaled up */
+  const nw = W >> 1, nh = H >> 1, small = document.createElement("canvas"); small.width = nw; small.height = nh;
+  const sg = small.getContext("2d"), img = sg.createImageData(nw, nh), px = img.data;
+  for (let y = 0; y < nh; y++) {
+    const lat = (.5 - (y + .5) / nh) * Math.PI, cl = Math.cos(lat), dy = Math.sin(lat);
+    for (let x = 0; x < nw; x++) {
+      const lon = (x + .5) / nw * Math.PI * 2, dx = cl * Math.cos(lon), dz = cl * Math.sin(lon);
+      const w = fbm(dx * 1.3 + 7, dy * 1.3, dz * 1.3, 3) * 1.5;
+      const n = fbm(dx * 2.1 + w, dy * 2.1 + w, dz * 2.1 + w + 3, 5);
+      const bd = (dy * .9 + dx * .35 - .08) * 2.6, band = Math.exp(-bd * bd);              /* faint galactic band */
+      let d = Math.min(1, Math.max(0, (n - .44) * 3.3) * (.4 + .95 * band));
+      const dust = fbm(dx * 5 + 11, dy * 5, dz * 5, 4);
+      d *= .55 + .9 * dust;
+      const tt = Math.min(.999, Math.max(0, fbm(dx * 1.1 - 4, dy * 1.1 + 2, dz * 1.1, 3) * 1.35 - .12)) * 3, i = tt | 0, f = tt - i, c1 = PAL[i], c2 = PAL[i + 1];
+      const k = d * d * .78 + d * .08, base = 7 + dust * 9, o = (y * nw + x) * 4;
+      px[o] = Math.min(255, base + mix(c1[0], c2[0], f) * k);
+      px[o + 1] = Math.min(255, base + mix(c1[1], c2[1], f) * k * .95);
+      px[o + 2] = Math.min(255, base + 2 + mix(c1[2], c2[2], f) * k);
+      px[o + 3] = 255;
+    }
+  }
+  sg.putImageData(img, 0, 0);
+  const c = document.createElement("canvas"); c.width = W; c.height = H;
+  const g = c.getContext("2d"); g.imageSmoothingEnabled = true; g.imageSmoothingQuality = "high"; g.drawImage(small, 0, 0, W, H);
+
+  /* stars: uniform on the sphere, stretched horizontally toward the poles so they stay round when viewed */
+  const N = Math.round(W * H / 850);
+  for (let i = 0; i < N; i++) {
+    const x = rnd() * W, colat = Math.acos(1 - 2 * rnd()), y = colat / Math.PI * H, m = rnd(), stretch = 1 / Math.max(.18, Math.sin(colat));
+    const r = .45 + 1.7 * Math.pow(m, 7) * (W / 2048), cr = rnd(), col = cr < .08 ? [165, 200, 255] : cr < .2 ? [255, 222, 190] : [255, 255, 255];
+    const a = .35 + .65 * Math.pow(m, .5), glow = r > 1.3 ? r * 4.5 : 0;
+    for (const ox of (x < glow * stretch * 2 ? [0, W] : x > W - glow * stretch * 2 ? [0, -W] : [0])) {
+      g.save(); g.translate(x + ox, y); g.scale(stretch, 1);
+      if (glow) { const rg = g.createRadialGradient(0, 0, 0, 0, 0, glow); rg.addColorStop(0, `rgba(${col},${a * .55})`); rg.addColorStop(1, `rgba(${col},0)`); g.fillStyle = rg; g.beginPath(); g.arc(0, 0, glow, 0, 6.2832); g.fill(); }
+      g.fillStyle = `rgba(${col},${a})`; g.beginPath(); g.arc(0, 0, r, 0, 6.2832); g.fill(); g.restore();
+    }
+  }
+  return c;
+}
+/*SKYGEN_END*/
+
+/* Reflection environment for the chrome: the sky itself plus a few bright light panels (white softbox, warm amber, cool blue).
+   Chrome only looks like chrome when it has bright shapes to reflect — a pure black sky alone would give black metal. */
+function buildEnv(renderer, skyTex) {
+  const es = new THREE.Scene(), dg = new THREE.SphereGeometry(50, 48, 32); dg.scale(-1, 1, 1);
+  es.add(new THREE.Mesh(dg, new THREE.MeshBasicMaterial({ map: skyTex, toneMapped: false })));
+  const panel = (w, h, col, x, y, z) => { const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ color: col, side: THREE.DoubleSide, toneMapped: false })); m.position.set(x, y, z); m.lookAt(0, 0, 0); es.add(m); };
+  panel(46, 9, new THREE.Color(5.5, 5.5, 6), 0, 24, 16);          /* top softbox */
+  panel(7, 36, new THREE.Color(4.6, 2.5, 1.1), -26, 0, 11);       /* warm amber strip, left */
+  panel(7, 36, new THREE.Color(1.5, 2.7, 5), 26, 2, 9);           /* cool blue strip, right */
+  panel(3, 30, new THREE.Color(5, 5, 5), -9, 0, 22);              /* thin white edge-light */
+  panel(3, 30, new THREE.Color(4, 4, 4.4), 12, 0, 21);
+  panel(40, 5, new THREE.Color(3, 2.6, 2.4), 0, -15, 19);         /* low warm fill */
+  const pm = new THREE.PMREMGenerator(renderer), rt = pm.fromScene(es, .02); pm.dispose();
+  es.traverse(o => { o.geometry && o.geometry.dispose(); o.material && o.material.dispose(); });   /* free the temporary scene; skyTex stays for the visible dome */
+  return rt.texture;
+}
+
+/* sky: load the panorama from SKY_URL when served over http(s). Opened straight from disk (file://) browsers
+   block WebGL from using local image files, so the procedural sky is used there. Any failure → procedural sky. */
+function loadSky(done) {
+  if (!SKY_URL || !/^https?:/.test(location.protocol)) return done(null);
+  new THREE.TextureLoader().load(SKY_URL, done, undefined, () => { console.info("[JEE.DSGNS] " + SKY_URL + " not found — using the generated 360° sky. Add your panorama at that path to use it."); done(null); });
+}
+function fail() {   /* only when WebGL / Three.js genuinely cannot run */
+  document.body.classList.add("nogl");
+  try { document.body.style.backgroundImage = `url(${makeSkyCanvas(1536, 768).toDataURL("image/jpeg", .82)})`; } catch (e) {}
+  const f = () => hint.classList.add("on"); window.gsap ? gsap.to(hint, { opacity: .6, duration: 1, delay: 1 }) : 0; setTimeout(f, 1500);
+}
+
+(function init() {
+  if (!window.THREE || !window.gsap) return fail();
+  try { renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false, powerPreference: "high-performance" }); } catch (e) { return fail(); }
+  renderer.setPixelRatio(Math.min(devicePixelRatio, TOUCH ? 1.5 : 2)); renderer.setClearColor(0x000000);
+  renderer.outputEncoding = THREE.sRGBEncoding; renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.15;
+  const scene = new THREE.Scene();
+  camera = new THREE.PerspectiveCamera(55, 1, .1, 200); camera.rotation.order = "YXZ"; scene.add(camera);
+
+  /* chrome logo (child of the camera, so it stays centered while the sky moves around it) */
+  const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, metalness: 1, roughness: .1, envMapIntensity: 1.7 });
+  const logo = new THREE.Group();
+  const P = a => { const o = []; for (let i = 0; i < a.length; i += 2) o.push(new THREE.Vector2((a[i] - W / 2) * S, -(a[i + 1] - H / 2) * S)); return o; };
+  SHAPES.forEach(s => {
+    const sh = new THREE.Shape(P(s[0])); for (let i = 1; i < s.length; i++) sh.holes.push(new THREE.Path(P(s[i])));
+    const geo = new THREE.ExtrudeGeometry(sh, { depth: .2, bevelEnabled: true, bevelThickness: .045, bevelSize: .014, bevelOffset: -.014, bevelSegments: 5, curveSegments: 1 });
+    geo.translate(0, 0, -.1); logo.add(new THREE.Mesh(geo, mat));
+  });
+  group = new THREE.Group(); group.add(logo); camera.add(group);
+  const hit = new THREE.Mesh(new THREE.BoxGeometry(6.2, .9, .6), new THREE.MeshBasicMaterial({ visible: false })); group.add(hit);
+  const l1 = new THREE.DirectionalLight(0xffffff, 1.1); l1.position.set(3, 4, 5); scene.add(l1);
+  const l2 = new THREE.DirectionalLight(0x7fb0ff, 1.2); l2.position.set(-5, 1, -3); scene.add(l2);
+  const l3 = new THREE.DirectionalLight(0xffc89a, 1.3); l3.position.set(-4, 2, 6); scene.add(l3);   /* warm rim/edge light */
+
+  state = { blend: 0 };
+  const m = { x: 0, y: 0, tx: 0, ty: 0 }, drag = { yaw: 0, pitch: 0 };
+  const AMP = REDUCED ? .1 : 1, clampN = (v, a, b) => Math.min(b, Math.max(a, v));
+
+  /* cursor / touch-drag -> view direction */
+  addEventListener("pointermove", e => {
+    if (e.pointerType === "mouse") { m.tx = e.clientX / innerWidth * 2 - 1; m.ty = e.clientY / innerHeight * 2 - 1; }
+  });
+  let last = null;
+  canvas.addEventListener("pointerdown", e => { if (e.pointerType === "touch") { last = [e.clientX, e.clientY]; drag.moved = 0; } });
+  addEventListener("pointermove", e => { if (e.pointerType === "touch" && last) { drag.moved += Math.abs(e.clientX - last[0]) + Math.abs(e.clientY - last[1]); drag.yaw += (e.clientX - last[0]) * .0035 * AMP; drag.pitch = clampN(drag.pitch + (e.clientY - last[1]) * .0035 * AMP, -.4, .4); last = [e.clientX, e.clientY]; } });
+  addEventListener("pointerup", () => last = null);
+
+  let baseZ = 12;
+  function resize() {
+    const w = innerWidth, h = innerHeight; renderer.setSize(w, h, false); camera.aspect = w / h;
+    baseZ = Math.max(6.4 / (2 * Math.tan(camera.fov * Math.PI / 360) * camera.aspect * (w < 700 ? .92 : .72)), 6);
+    camera.updateProjectionMatrix(); if (!entering) group.position.z = -baseZ;
+  }
+  addEventListener("resize", resize); resize();
+
+  const ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
+  function onLogo(e) { ndc.set(e.clientX / innerWidth * 2 - 1, -(e.clientY / innerHeight) * 2 + 1); camera.updateMatrixWorld(); ray.setFromCamera(ndc, camera); return ray.intersectObject(hit).length > 0; }
+  canvas.addEventListener("pointermove", e => document.body.classList.toggle("hover", onLogo(e)));
+  addEventListener("dblclick", e => { if (onLogo(e)) enter(); });                                   /* desktop: double-click only */
+  addEventListener("pointerup", e => { if (e.pointerType === "touch" && onLogo(e) && (drag.moved || 0) < 8) enter(); }); /* touch: tap */
+
+  const ease = t => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2, clock = new THREE.Clock();
+  let sky = null;
+  function start(tex) {
+    /* a sky ALWAYS exists: your panorama if it loaded, otherwise the generated one (never flat black) */
+    const skyTex = tex || new THREE.CanvasTexture(makeSkyCanvas(TOUCH ? 1024 : 2048, TOUCH ? 512 : 1024));
+    skyTex.encoding = THREE.sRGBEncoding; skyTex.wrapS = THREE.RepeatWrapping;
+    skyTex.generateMipmaps = false; skyTex.minFilter = THREE.LinearFilter;   /* no mipmaps → no hairline at the wrap seam */
+    const g = new THREE.SphereGeometry(100, 64, 40); g.scale(-1, 1, 1);      /* equirect UVs on an inside-out sphere around the camera */
+    sky = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ map: skyTex, toneMapped: false, depthWrite: false }));
+    sky.renderOrder = -1; sky.frustumCulled = false; scene.add(sky);
+    scene.environment = buildEnv(renderer, skyTex);                           /* THIS is what makes the logo chrome instead of black */
+    (function loop() {
+      requestAnimationFrame(loop);
+      const t = REDUCED ? 0 : clock.getElapsedTime();
+      m.x += (m.tx - m.x) * .06; m.y += (m.ty - m.y) * .06;
+      /* view direction: eased toward the target so it glides instead of snapping; pitch is clamped */
+      const ty = -m.tx * .55 * AMP + drag.yaw + t * .008, tp = clampN(-m.ty * .3 * AMP + drag.pitch, -.4, .4);
+      camera.rotation.y += (ty - camera.rotation.y) * .04; camera.rotation.x += (tp - camera.rotation.x) * .04;
+      const cyc = t % 24, spin = Math.PI * 2 * ease(Math.min(Math.max((cyc - 18.5) / 5.5, 0), 1));
+      const auto = Math.sin(t * .38) * .55 + spin, front = Math.round(auto / (Math.PI * 2)) * Math.PI * 2, k = state.blend;
+      group.rotation.y = auto * (1 - k) + front * k + m.x * .3 * (1 - k);
+      group.rotation.x = (Math.sin(t * .6) * .05 + m.y * .15) * (1 - k);
+      group.rotation.z = Math.sin(t * .5) * .012;
+      if (!entering) group.position.y = Math.sin(t * .9) * .09;
+      renderer.render(scene, camera);
+    })();
+    gsap.to(canvas, { opacity: 1, duration: 2.2, delay: .2, ease: "power2.out" });
+    gsap.fromTo(group.position, { z: -baseZ * 1.25 }, { z: -baseZ, duration: 3, delay: .2, ease: "power3.out" });
+    gsap.delayedCall(1.8, () => hint.classList.add("on")); gsap.to(hint, { opacity: .6, duration: 1, delay: 1.8 });
+  }
+  loadSky(start);
+})();
+</script>
+</body>
+</html>
